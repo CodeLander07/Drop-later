@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notes Admin</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
+      input, button, select, textarea { padding: 8px; margin: 4px; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #ddd; padding: 8px; }
+      tr.delivered { animation: pulse 0.6s; background: #ecffec; }
+      @keyframes pulse { 0% { background: #fff; } 50% { background: #ecffec; } 100% { background: #fff; } }
+    </style>
+  </head>
+  <body>
+    <h1>Notes Admin</h1>
+    <section>
+      <h3>Create Note</h3>
+      <div>
+        <input id="token" placeholder="Admin token" style="width:280px" />
+      </div>
+      <div>
+        <input id="title" placeholder="Title" />
+        <input id="webhookUrl" placeholder="Webhook URL" value="http://localhost:4000/sink" style="width:320px" />
+      </div>
+      <div>
+        <textarea id="body" placeholder="Body" rows="3" cols="60"></textarea>
+      </div>
+      <div>
+        <input id="releaseAt" placeholder="ISO releaseAt" style="width:280px" />
+        <button id="createBtn">Create</button>
+      </div>
+    </section>
+    <section>
+      <h3>Notes</h3>
+      <div>
+        <select id="status">
+          <option value="">All</option>
+          <option>pending</option>
+          <option>delivered</option>
+          <option>failed</option>
+          <option>dead</option>
+        </select>
+        <button id="loadBtn">Load</button>
+      </div>
+      <table id="tbl">
+        <thead>
+          <tr><th>id</th><th>title</th><th>status</th><th>last code</th><th>actions</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+    <script>
+      const api = location.origin;
+      const tbody = document.querySelector('#tbl tbody');
+      const tokenEl = document.querySelector('#token');
+      async function load() {
+        const status = document.querySelector('#status').value;
+        const url = new URL(api + '/api/notes');
+        if (status) url.searchParams.set('status', status);
+        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + tokenEl.value } });
+        const data = await res.json();
+        tbody.innerHTML = '';
+        for (const it of data.items) {
+          const tr = document.createElement('tr');
+          tr.dataset.id = it.id;
+          tr.innerHTML = `<td>${it.id}</td><td>${it.title}</td><td class="status">${it.status}</td><td>${it.lastAttempt? it.lastAttempt.statusCode: ''}</td><td><button class="replay">Replay</button></td>`;
+          tbody.appendChild(tr);
+          tr.querySelector('.replay').onclick = async () => {
+            await fetch(api + '/api/notes/' + it.id + '/replay', { method: 'POST', headers: { Authorization: 'Bearer ' + tokenEl.value } });
+            await load();
+          };
+        }
+      }
+      document.querySelector('#loadBtn').onclick = load;
+      document.querySelector('#createBtn').onclick = async () => {
+        const body = {
+          title: document.querySelector('#title').value,
+          body: document.querySelector('#body').value,
+          releaseAt: document.querySelector('#releaseAt').value,
+          webhookUrl: document.querySelector('#webhookUrl').value,
+        };
+        await fetch(api + '/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tokenEl.value }, body: JSON.stringify(body) });
+        await load();
+      };
+      setInterval(async () => {
+        const rows = [...tbody.querySelectorAll('tr')];
+        for (const tr of rows) {
+          const id = tr.dataset.id;
+          const status = document.querySelector('#status').value;
+        }
+        await load();
+      }, 4000);
+    </script>
+  </body>
+  </html>
+
+
